@@ -1,0 +1,41 @@
+services:
+
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: cinelang_postgres
+    environment:
+      POSTGRES_USER: cinelang
+      POSTGRES_PASSWORD: cinelang_secret
+      POSTGRES_DB: cinelang
+    ports:
+      - "5432:5432"
+    volumes:
+      - cinelang_pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cinelang"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Ollama — serves Gemma 3 4B locally
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cinelang_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - cinelang_ollama_models:/root/.ollama
+    # GPU support (comment out if no GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  cinelang_pgdata:
+  cinelang_ollama_models:

@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg:       #fafaf8;
+    --surface:  #ffffff;
+    --border:   #e8e2da;
+    --text:     #1c1917;
+    --muted:    #78716c;
+    --cinema:   #e85d2f;
+    --violet:   #6d28d9;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track  { background: #f5f5f4; }
+  ::-webkit-scrollbar-thumb  { background: #d6d3d1; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+  ::selection { background: #fde3d1; color: #d44922; }
+}
+
+@layer components {
+  /* Card */
+  .card {
+    @apply bg-white rounded-2xl border border-warm-200 shadow-warm;
+  }
+  .card-sm {
+    @apply bg-white rounded-xl border border-warm-200 shadow-warm-sm;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cinema-500 text-white font-medium
+           text-sm transition-all hover:bg-cinema-600 active:scale-95 shadow-warm-sm;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-warm-200 text-warm-700
+           font-medium text-sm transition-all hover:bg-cream-200 active:scale-95;
+  }
+  .btn-icon {
+    @apply p-2 rounded-lg border border-warm-200 text-warm-500 hover:text-cinema-500
+           hover:border-cinema-200 transition-all;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-warm-200 bg-white text-warm-900
+           text-sm outline-none ring-0 transition-all placeholder:text-warm-400
+           focus:border-cinema-300 focus:ring-2 focus:ring-cinema-100;
+  }
+  .select {
+    @apply px-3 py-2 rounded-xl border border-warm-200 bg-white text-warm-800
+           text-sm outline-none cursor-pointer transition-all
+           focus:border-cinema-300;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full border;
+  }
+
+  /* Tabs */
+  .tab {
+    @apply pb-2 text-sm font-medium transition-all border-b-2 border-transparent
+           text-warm-500 hover:text-warm-800 whitespace-nowrap;
+  }
+  .tab-active {
+    @apply border-cinema-500 text-cinema-600;
+  }
+
+  /* Flip card */
+  .flip-scene        { perspective: 1000px; }
+  .flip-inner        { transform-style: preserve-3d; transition: transform .55s cubic-bezier(.4,0,.2,1); }
+  .flip-inner.flip   { transform: rotateY(180deg); }
+  .flip-face         { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .flip-back         { transform: rotateY(180deg); }
+
+  /* Equalizer animation */
+  .eq-bar {
+    @apply inline-block w-0.5 rounded-sm bg-cinema-400;
+    animation: eq .9s ease-in-out infinite;
+  }
+
+  /* Shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, #f5f5f4 25%, #e7e5e4 50%, #f5f5f4 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+}

@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineLang — Learn Languages Through Cinema</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@400;500;600&family=Syne+Mono&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      obsidian:'#06060c', midnight:'#0d0d1a', surface:'#12121f',
+      panel:'#181828', border:'#2a2a45', neon:'#ff3c5f',
+      gold:'#f5c842', violet:'#7c5cfc', teal:'#00d4aa', dim:'#5a5a78',
+    },
+    fontFamily: {
+      heading:['Syne','sans-serif'],
+      body:['Instrument Sans','sans-serif'],
+      mono:['Syne Mono','monospace'],
+    }
+  }}
+}
+</script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body,#root{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 20% 10%,#131326 0%,#06060c 70%);font-family:'Instrument Sans',sans-serif;color:#e0e0f0;min-height:100vh}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#0d0d1a}::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:3px}
+@keyframes eq{0%,100%{height:4px}25%{height:14px}50%{height:8px}75%{height:18px}}
+.eq-bar{display:inline-block;width:3px;background:#ff3c5f;border-radius:2px;margin:0 1px;animation:eq .9s ease-in-out infinite}
+@keyframes slide-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.slide-in{animation:slide-in .25s ease forwards}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.shimmer{background:linear-gradient(90deg,#1a1a30 25%,#252540 50%,#1a1a30 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+.glass{background:rgba(18,18,31,.75);backdrop-filter:blur(14px)}
+.card-glow:hover{box-shadow:0 0 22px 2px #ff3c5f18,0 4px 28px #00000055}
+.kw{color:#f5c842;font-weight:600;cursor:pointer}.kw:hover{text-shadow:0 0 8px #f5c84280}
+.flip-scene{perspective:900px;height:240px}
+.flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s}
+.flip-inner.flipped{transform:rotateY(180deg)}
+.flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:16px;padding:24px}
+.flip-back{transform:rotateY(180deg)}
+input[type=file]{display:none}
+.tab-on{border-bottom:2px solid #ff3c5f;color:#fff}
+.tab-off{border-bottom:2px solid transparent;color:#5a5a78}
+.tab-off:hover{color:#a0a0c0}
+select,input{color-scheme:dark}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const API = 'http://localhost:8000';
+
+// ─── Language list ────────────────────────────────────────────────────────────
+const LANGS = [
+  {code:'en',label:'English',flag:'🇬🇧'},{code:'fr',label:'French',flag:'🇫🇷'},
+  {code:'de',label:'German',flag:'🇩🇪'},{code:'es',label:'Spanish',flag:'🇪🇸'},
+  {code:'it',label:'Italian',flag:'🇮🇹'},{code:'pt',label:'Portuguese',flag:'🇵🇹'},
+  {code:'ja',label:'Japanese',flag:'🇯🇵'},{code:'ko',label:'Korean',flag:'🇰🇷'},
+  {code:'zh',label:'Mandarin',flag:'🇨🇳'},{code:'ru',label:'Russian',flag:'🇷🇺'},
+  {code:'ar',label:'Arabic',flag:'🇸🇦'},{code:'nl',label:'Dutch',flag:'🇳🇱'},
+  {code:'pl',label:'Polish',flag:'🇵🇱'},{code:'sv',label:'Swedish',flag:'🇸🇪'},
+  {code:'tr',label:'Turkish',flag:'🇹🇷'},{code:'hi',label:'Hindi',flag:'🇮🇳'},
+];
+const langLabel = code => { const l = LANGS.find(x=>x.code===code); return l ? `${l.flag} ${l.label}` : code; };
+
+// ─── Seed data ─────────────────────────────────────────────────────────────────
+const SEEDS = {
+  fr:[
+    {id:-1,word:'kiffer',translation:'to love / dig (slang)',pos:'Verb',phonetic:'kee-FAY',explanation:'Verlan slang for loving something intensely',status:'learning',count:4,contexts:['Je kiffe ce film !'],target_lang:'fr',source_lang:'en'},
+    {id:-2,word:'flic',translation:'cop / police (slang)',pos:'Noun',phonetic:'FLEEK',explanation:'Informal term for a police officer',status:'new',count:7,contexts:['Le flic est arrivé trop tard.'],target_lang:'fr',source_lang:'en'},
+    {id:-3,word:'grave',translation:'seriously / totally (slang)',pos:'Adverb',phonetic:'GRAHV',explanation:'Youth slang intensifier',status:'mastered',count:5,contexts:["C'est grave cool !"],target_lang:'fr',source_lang:'en'},
+    {id:-4,word:'cafard',translation:'cockroach; feeling blue',pos:'Noun',phonetic:'kah-FAR',explanation:'Avoir le cafard = to feel melancholy',status:'new',count:2,contexts:["J'ai le cafard."],target_lang:'fr',source_lang:'en'},
+    {id:-5,word:'chelou',translation:'shady / weird (verlan)',pos:'Adjective',phonetic:'shuh-LOO',explanation:'Verlan of louche — suspicious or strange',status:'learning',count:6,contexts:['Ce mec est chelou.'],target_lang:'fr',source_lang:'en'},
+    {id:-6,word:'époustouflant',translation:'breathtaking / mind-blowing',pos:'Adjective',phonetic:'ay-poo-stoo-FLAHN',explanation:'Expresses extreme astonishment',status:'new',count:1,contexts:['La scène était époustouflante.'],target_lang:'fr',source_lang:'en'},
+    {id:-7,word:'dépaysement',translation:'pleasant disorientation abroad',pos:'Noun',phonetic:'day-pay-eez-MAHN',explanation:'Feeling of pleasant unfamiliarity in a foreign place',status:'new',count:1,contexts:['Un dépaysement total.'],target_lang:'fr',source_lang:'en'},
+    {id:-8,word:'se barrer',translation:'to take off / leave abruptly',pos:'Verb',phonetic:'suh bah-RAY',explanation:'Colloquial for leaving quickly',status:'learning',count:3,contexts:["Il s'est barré sans dire au revoir."],target_lang:'fr',source_lang:'en'},
+  ],
+  de:[
+    {id:-1,word:'Fernweh',translation:'wanderlust / longing for distant places',pos:'Noun',phonetic:'FERN-vay',explanation:'Deep longing to travel far away',status:'new',count:2,contexts:['Ich habe Fernweh.'],target_lang:'de',source_lang:'en'},
+    {id:-2,word:'Weltschmerz',translation:'world-weariness / existential sadness',pos:'Noun',phonetic:'VELT-shmerts',explanation:'Sadness from the gap between ideal and reality',status:'learning',count:2,contexts:['Er empfindet Weltschmerz.'],target_lang:'de',source_lang:'en'},
+    {id:-3,word:'Klugscheißer',translation:'know-it-all (lit. smart sh*tter)',pos:'Noun',phonetic:'KLOOG-shy-ser',explanation:'Person who always corrects others pedantically',status:'mastered',count:3,contexts:['Sei kein Klugscheißer!'],target_lang:'de',source_lang:'en'},
+    {id:-4,word:'Drachenfutter',translation:'peace offering to an angry partner',pos:'Noun',phonetic:'DRAH-khen-foo-ter',explanation:'Gift given to appease a displeased partner',status:'new',count:1,contexts:['Er kaufte Blumen als Drachenfutter.'],target_lang:'de',source_lang:'en'},
+    {id:-5,word:'verschlimmbessern',translation:'to make worse by trying to improve',pos:'Verb',phonetic:'fer-SHLIM-bes-ern',explanation:'Worsening something by attempting to fix it',status:'new',count:1,contexts:['Er hat alles verschlimmbessert.'],target_lang:'de',source_lang:'en'},
+  ],
+  es:[
+    {id:-1,word:'madrugada',translation:'small hours of the morning',pos:'Noun',phonetic:'mah-droo-GAH-dah',explanation:'The hours between midnight and dawn',status:'new',count:2,contexts:['Es la madrugada.'],target_lang:'es',source_lang:'en'},
+    {id:-2,word:'sobremesa',translation:'after-dinner table conversation',pos:'Noun',phonetic:'so-breh-MEH-sah',explanation:'Time spent chatting at the table after a meal',status:'learning',count:1,contexts:['La sobremesa duró horas.'],target_lang:'es',source_lang:'en'},
+    {id:-3,word:'trasnochar',translation:'to stay up all night',pos:'Verb',phonetic:'tras-no-CHAR',explanation:'To spend the night awake',status:'mastered',count:2,contexts:['Trasnochamos viendo películas.'],target_lang:'es',source_lang:'en'},
+    {id:-4,word:'estrenar',translation:'to use/wear for the first time',pos:'Verb',phonetic:'es-treh-NAR',explanation:'To debut or premiere something',status:'new',count:3,contexts:['Voy a estrenar mis zapatos.'],target_lang:'es',source_lang:'en'},
+  ],
+};
+
+const MOCK_SUBS = {
+  fr:[
+    {index:1,start:'00:00:10,000',end:'00:00:13,500',original:'Welcome to Paris, the city of light.',text:'Bienvenue à Paris, la ville lumière.'},
+    {index:2,start:'00:00:14,000',end:'00:00:17,200',original:"I really love this film from the beginning.",text:'Je kiffe vraiment ce film depuis le début.'},
+    {index:3,start:'00:00:18,000',end:'00:00:21,000',original:'The cop arrived too late that night.',text:'Le flic est arrivé trop tard ce soir.'},
+    {index:4,start:'00:00:22,000',end:'00:00:25,500',original:"That guy is really weird, don't you think?",text:'Ce mec est grave chelou, tu crois pas ?'},
+    {index:5,start:'00:00:26,000',end:'00:00:29,000',original:"I've been feeling blue since yesterday.",text:"J'ai le cafard depuis hier soir."},
+    {index:6,start:'00:00:30,000',end:'00:00:33,200',original:'He took off without saying goodbye.',text:"Il s'est barré sans dire au revoir."},
+    {index:7,start:'00:00:34,000',end:'00:00:37,500',original:'The final scene was absolutely breathtaking!',text:'La scène finale était époustouflante !'},
+  ],
+  de:[
+    {index:1,start:'00:00:10,000',end:'00:00:13,500',original:'Welcome to Berlin, the city of culture.',text:'Willkommen in Berlin, der Stadt der Kultur.'},
+    {index:2,start:'00:00:14,000',end:'00:00:17,200',original:'I have such a longing to travel far away.',text:'Ich habe so starkes Fernweh.'},
+    {index:3,start:'00:00:18,000',end:'00:00:21,000',original:'He feels deep sadness about the state of the world.',text:'Er empfindet tiefen Weltschmerz.'},
+    {index:4,start:'00:00:22,000',end:'00:00:25,500',original:"Don't be such a know-it-all!",text:'Sei kein Klugscheißer!'},
+  ],
+  es:[
+    {index:1,start:'00:00:10,000',end:'00:00:13,500',original:'It is the early hours of the morning.',text:'Es la madrugada.'},
+    {index:2,start:'00:00:14,000',end:'00:00:17,200',original:'After dinner, we talked for hours at the table.',text:'Después de cenar, la sobremesa duró horas.'},
+    {index:3,start:'00:00:18,000',end:'00:00:21,000',original:'We stayed up all night watching films.',text:'Trasnochamos viendo películas.'},
+  ],
+};
+
+function getSeedSubs(tgt) { return MOCK_SUBS[tgt] || MOCK_SUBS.fr; }
+function getSeedVocab(tgt) { return (SEEDS[tgt] || SEEDS.fr).map(w => ({...w})); }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function speak(text, lang='fr') {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang + '-' + lang.toUpperCase();
+  u.rate = 0.85;
+  window.speechSynthesis.speak(u);
+}
+
+const POS_COLOR = {Verb:'#7c5cfc',Noun:'#00d4aa',Adjective:'#f5c842',Adverb:'#ff7f50',Idiom:'#ff3c5f',Slang:'#f472b6',Phrase:'#38bdf8'};
+const STATUS_CYCLE = {new:'learning',learning:'mastered',mastered:'new'};
+const STATUS_STYLE = {
+  new:      {bg:'#2a1a4a',color:'#a78bfa',border:'#7c5cfc44'},
+  learning: {bg:'#1a2a20',color:'#34d399',border:'#34d39944'},
+  mastered: {bg:'#2a1a1a',color:'#f59e0b',border:'#f59e0b44'},
+};
+function stStyle(s) { return STATUS_STYLE[s] || STATUS_STYLE.new; }
+
+function exportAnki(vocab) {
+  const lines = vocab.map(w =>
+    [w.word,w.translation||'',w.pos,w.phonetic||'',w.explanation||'',(w.contexts||[]).join(' | ')].join('\t')
+  );
+  const blob = new Blob(['#separator:tab\n#notetype:Basic\n#deck:CineLang\n' + lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cinelang.txt'; a.click();
+}
+
+// ─── Tiny components ──────────────────────────────────────────────────────────
+function EqWave() {
+  return <span className="inline-flex items-end h-5 gap-px ml-1">{[1,2,3,4,5].map(i=><span key={i} className="eq-bar" style={{animationDelay:`${i*.1}s`}}/>)}</span>;
+}
+function Pill({label,color}) {
+  return <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full border" style={{color,borderColor:color+'44',background:color+'11'}}><span className="w-1.5 h-1.5 rounded-full" style={{background:color}}/>{label}</span>;
+}
+function StatusBadge({status,onClick}) {
+  const s = stStyle(status);
+  return <button onClick={onClick} className="text-xs font-mono px-2 py-0.5 rounded-full border transition-all" style={{background:s.bg,color:s.color,borderColor:s.border}}>{status||'new'}</button>;
+}
+function MetricCard({label,value,sub,color='neon',icon}) {
+  const c = {neon:'#ff3c5f',gold:'#f5c842',violet:'#7c5cfc',teal:'#00d4aa'}[color]||'#ff3c5f';
+  return <div className="card-glow rounded-xl border p-4 flex flex-col gap-1 transition-all" style={{background:'#12121f',borderColor:c+'33'}}>
+    <div className="flex items-center gap-2 text-dim text-xs font-mono uppercase tracking-widest"><span style={{color:c}}>{icon}</span>{label}</div>
+    <div className="text-3xl font-heading font-bold" style={{color:c}}>{value}</div>
+    {sub&&<div className="text-xs text-dim font-mono">{sub}</div>}
+  </div>;
+}
+function StackedBar({data}) {
+  return <div className="flex rounded-full overflow-hidden h-3 w-full gap-px">
+    {data.map((d,i)=><div key={i} title={`${d.label}: ${Math.round(d.pct)}%`} className="transition-all duration-700" style={{width:`${d.pct}%`,background:d.color,minWidth:d.pct>0?3:0}}/>)}
+  </div>;
+}
+function ProgressBar({pct,color='#00d4aa'}) {
+  return <div className="h-1.5 rounded-full bg-border overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{width:`${pct}%`,background:color}}/></div>;
+}
+function Toast({msg,type}) {
+  const colors = {ok:['#0a1a10','#00d4aa55','#00d4aa'],warn:['#1a1a0a','#f5c84255','#f5c842'],err:['#2a0a10','#ff3c5f55','#ff6080']};
+  const [bg,br,c] = colors[type]||colors.ok;
+  return <div className="fixed top-4 right-4 z-50 slide-in px-4 py-3 rounded-xl border text-sm font-body shadow-2xl" style={{background:bg,borderColor:br,color:c}}>{msg}</div>;
+}
+
+// ─── Word Detail Modal ─────────────────────────────────────────────────────────
+function WordModal({word,onClose,onStatusChange,onEnrich,enriching,targetLang}) {
+  if (!word) return null;
+  const pc = POS_COLOR[word.pos]||'#aaa';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:'rgba(6,6,12,.88)',backdropFilter:'blur(8px)'}} onClick={onClose}>
+      <div className="slide-in glass rounded-2xl border border-border w-full max-w-lg p-6 relative" style={{borderColor:'#ff3c5f33'}} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-dim hover:text-white text-xl">×</button>
+        <div className="flex items-start gap-3 mb-5">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-3xl font-heading font-bold text-white">{word.word}</h2>
+              <button onClick={()=>speak(word.word,targetLang)} className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-neon hover:bg-neon hover:text-white transition-all text-xs">▶</button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Pill label={word.pos||'?'} color={pc}/>
+              <span className="font-mono text-sm text-dim">{word.phonetic||'—'}</span>
+              <StatusBadge status={word.status||'new'} onClick={()=>onStatusChange(word,STATUS_CYCLE[word.status||'new'])}/>
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-3 mb-5">
+          <div className="rounded-xl p-3 border border-border" style={{background:'#0d0d1a'}}>
+            <div className="text-xs text-dim uppercase tracking-widest mb-1 font-mono">Translation</div>
+            <div className="text-gold font-heading font-semibold text-lg">{word.translation||<span className="text-dim italic">Not enriched yet</span>}</div>
+          </div>
+          {word.explanation&&<div className="rounded-xl p-3 border border-border" style={{background:'#0d0d1a'}}>
+            <div className="text-xs text-dim uppercase tracking-widest mb-1 font-mono">Usage</div>
+            <div className="text-sm text-gray-300">{word.explanation}</div>
+          </div>}
+          {word.contexts?.length>0&&<div className="rounded-xl p-3 border border-border" style={{background:'#0d0d1a'}}>
+            <div className="text-xs text-dim uppercase tracking-widest mb-1 font-mono">Example Contexts</div>
+            {word.contexts.map((c,i)=><p key={i} className="text-sm text-gray-300 italic border-l-2 border-neon pl-3 mb-1">"{c}"</p>)}
+          </div>}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={()=>onEnrich(word)} disabled={enriching}
+            className="flex-1 py-2.5 rounded-xl text-sm font-heading font-semibold transition-all"
+            style={{background:enriching?'#2a2a45':'#ff3c5f',color:'#fff',opacity:enriching?.7:1}}>
+            {enriching?'⏳ Enriching…':'✨ Enrich with Gemini AI'}
+          </button>
+          <button onClick={()=>onStatusChange(word,STATUS_CYCLE[word.status||'new'])}
+            className="px-4 py-2.5 rounded-xl text-sm font-heading border border-border text-dim hover:text-white transition-all">
+            Next Status
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Study Mode (flip cards) ──────────────────────────────────────────────────
+function StudyMode({words,onClose,onGotIt,onKeepLearning}) {
+  const [idx,setIdx]       = useState(0);
+  const [flipped,setFlip]  = useState(false);
+  const [done,setDone]     = useState(false);
+
+  if (done || idx >= words.length) return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{background:'rgba(6,6,12,.97)'}}>
+      <div className="text-6xl mb-4">🎉</div>
+      <h2 className="text-3xl font-heading font-bold text-white mb-2">Session Complete!</h2>
+      <p className="text-dim text-sm font-mono mb-8">{words.length} cards reviewed</p>
+      <button onClick={onClose} className="px-8 py-3 rounded-xl font-heading font-semibold" style={{background:'#ff3c5f',color:'#fff'}}>Back to Dashboard</button>
+    </div>
+  );
+
+  const w = words[idx];
+  const pc = POS_COLOR[w.pos]||'#aaa';
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6" style={{background:'rgba(6,6,12,.97)'}}>
+      <div className="w-full max-w-md">
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-xs font-mono text-dim">{idx+1} / {words.length} cards</div>
+          <button onClick={onClose} className="text-dim hover:text-white text-sm">✕ End Session</button>
+        </div>
+        <ProgressBar pct={((idx)/words.length)*100} color="#7c5cfc"/>
+        <div className="mt-6 flip-scene cursor-pointer" onClick={()=>setFlip(f=>!f)}>
+          <div className={`flip-inner ${flipped?'flipped':''}`}>
+            {/* Front */}
+            <div className="flip-face" style={{background:'#181828',border:'1px solid #2a2a45'}}>
+              <Pill label={w.pos||'?'} color={pc}/>
+              <div className="text-5xl font-heading font-bold text-white mt-4 mb-2 text-center">{w.word}</div>
+              <div className="text-dim font-mono text-sm">{w.phonetic||'—'}</div>
+              <div className="mt-6 text-xs text-dim font-mono">Tap to reveal translation</div>
+            </div>
+            {/* Back */}
+            <div className="flip-back flip-face" style={{background:'#1a1020',border:'1px solid #ff3c5f33'}}>
+              <div className="text-2xl font-heading text-gold font-semibold text-center mb-3">{w.translation||'—'}</div>
+              {w.explanation&&<p className="text-sm text-gray-300 text-center mb-3 max-w-xs">{w.explanation}</p>}
+              {w.contexts?.[0]&&<p className="text-xs text-dim italic text-center border-t border-border pt-3 mt-1">"{w.contexts[0]}"</p>}
+            </div>
+          </div>
+        </div>
+        {flipped&&(
+          <div className="flex gap-3 mt-6 slide-in">
+            <button onClick={()=>{onKeepLearning(w);setIdx(i=>i+1);setFlip(false);}}
+              className="flex-1 py-3 rounded-xl font-heading text-sm border border-border text-dim hover:text-white transition-all">
+              Still Learning
+            </button>
+            <button onClick={()=>{onGotIt(w);setIdx(i=>i+1);setFlip(false);}}
+              className="flex-1 py-3 rounded-xl font-heading text-sm font-semibold transition-all"
+              style={{background:'#f59e0b',color:'#000'}}>
+              Got it! ✓
+            </button>
+          </div>
+        )}
+        {!flipped&&<p className="text-center text-dim text-xs font-mono mt-5">Click the card to flip</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Subtitle Player ──────────────────────────────────────────────────────────
+function SubtitlePlayer({subtitles,vocab,targetLang,onSeek,currentIdx,setCurrentIdx}) {
+  const [playing,setPlaying] = useState(false);
+  const timer = useRef(null);
+
+  useEffect(()=>{
+    if(playing){ timer.current=setInterval(()=>setCurrentIdx(p=>{const n=p+1;if(n>=subtitles.length){setPlaying(false);return p;}return n;}),3000); }
+    else clearInterval(timer.current);
+    return ()=>clearInterval(timer.current);
+  },[playing,subtitles.length]);
+
+  const wordSet = new Set(vocab.map(v=>v.word));
+  function highlight(text) {
+    return text.split(/(\s+)/).map((p,i)=>{
+      const cl = p.toLowerCase().replace(/[^a-zàâäéèêëïîôùûüÿæœçñßäöü]/g,'');
+      if(wordSet.has(cl)) return <span key={i} className="kw" onClick={()=>{onSeek&&onSeek(cl);speak(cl,targetLang);}}>{p}</span>;
+      return <span key={i}>{p}</span>;
+    });
+  }
+
+  const cur = subtitles[currentIdx];
+  return (
+    <div className="rounded-2xl border border-border overflow-hidden" style={{background:'#0d0d1a'}}>
+      <div className="relative" style={{background:'#000',minHeight:160}}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-5 py-4 text-center">
+          {cur ? <>
+            <div className="text-xs font-mono text-dim mb-2">{cur.start?.slice(0,8)} → {cur.end?.slice(0,8)}</div>
+            {cur.original&&<p className="text-dim text-sm leading-relaxed mb-1 italic">{cur.original}</p>}
+            <p className="text-white text-base font-heading leading-relaxed">{highlight(cur.text)}</p>
+            <div className="mt-2 text-xs text-dim font-mono">Frame {currentIdx+1} / {subtitles.length}</div>
+          </> : <p className="text-dim font-mono text-sm">Upload an .srt file to begin</p>}
+        </div>
+        {playing&&<div className="absolute top-2 right-2"><EqWave/></div>}
+      </div>
+      <div className="p-3 flex gap-2 border-t border-border">
+        <button onClick={()=>setCurrentIdx(Math.max(0,currentIdx-1))} className="p-2 rounded-lg border border-border text-dim hover:text-white text-xs transition-all">⏮</button>
+        <button onClick={()=>setPlaying(p=>!p)} className="flex-1 py-2 rounded-lg text-sm font-heading font-semibold transition-all"
+          style={{background:playing?'#ff3c5f22':'#ff3c5f',color:playing?'#ff3c5f':'#fff',border:playing?'1px solid #ff3c5f44':'none'}}>
+          {playing?'⏸ Pause':'▶ Play Scene'}
+        </button>
+        <button onClick={()=>setCurrentIdx(Math.min(subtitles.length-1,currentIdx+1))} className="p-2 rounded-lg border border-border text-dim hover:text-white text-xs transition-all">⏭</button>
+      </div>
+      {subtitles.length>0&&<div className="px-3 pb-3">
+        <div className="flex gap-px overflow-hidden rounded-full" style={{height:5}}>
+          {subtitles.map((_,i)=><div key={i} onClick={()=>setCurrentIdx(i)} className="cursor-pointer flex-1 rounded-full transition-all"
+            style={{background:i===currentIdx?'#ff3c5f':i<currentIdx?'#ff3c5f55':'#2a2a45'}}/>)}
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+// ─── Vocab Table ──────────────────────────────────────────────────────────────
+function VocabTable({vocab,onWordClick,onStatusChange,targetLang}) {
+  const [search,setSearch]   = useState('');
+  const [posF,setPosF]       = useState('All');
+  const [stF,setStF]         = useState('All');
+  const [sortBy,setSortBy]   = useState('count');
+
+  const filtered = vocab
+    .filter(w=>{
+      const q=search.toLowerCase();
+      return (!q||w.word.includes(q)||(w.translation||'').toLowerCase().includes(q))
+        &&(posF==='All'||w.pos===posF)
+        &&(stF==='All'||w.status===stF);
+    })
+    .sort((a,b)=>sortBy==='count'?b.count-a.count:a.word.localeCompare(b.word));
+
+  const posOptions=['All','Noun','Verb','Adjective','Adverb','Idiom','Slang','Phrase'];
+  const stOptions=['All','new','learning','mastered'];
+  const sel = "px-3 py-2 rounded-xl border border-border bg-surface text-sm text-gray-200 outline-none font-mono cursor-pointer";
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search words or translations…"
+          className="flex-1 min-w-48 px-3 py-2 rounded-xl border border-border bg-surface text-sm text-gray-200 placeholder-dim outline-none focus:border-violet transition-all font-body"/>
+        <select value={posF} onChange={e=>setPosF(e.target.value)} className={sel}>{posOptions.map(p=><option key={p}>{p}</option>)}</select>
+        <select value={stF} onChange={e=>setStF(e.target.value)} className={sel}>{stOptions.map(s=><option key={s}>{s}</option>)}</select>
+        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className={sel}>
+          <option value="count">Frequency ↓</option><option value="alpha">A → Z</option>
+        </select>
+      </div>
+      <div className="text-xs text-dim font-mono">{filtered.length} words matched</div>
+      <div className="rounded-xl border border-border overflow-hidden" style={{background:'#0d0d1a'}}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-dim text-xs font-mono uppercase tracking-wider">
+              <th className="px-4 py-3 text-left">Word</th>
+              <th className="px-4 py-3 text-left">Type</th>
+              <th className="px-4 py-3 text-left">Translation</th>
+              <th className="px-4 py-3 text-center">Freq</th>
+              <th className="px-4 py-3 text-center">Status</th>
+              <th className="px-4 py-3 text-center">TTS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-dim font-mono text-xs">No words match your filters</td></tr>}
+            {filtered.map(w=>(
+              <tr key={w.id||w.word} onClick={()=>onWordClick(w)} className="border-b border-border cursor-pointer hover:bg-surface transition-all">
+                <td className="px-4 py-3">
+                  <span className="font-heading font-semibold text-white">{w.word}</span>
+                  {w.phonetic&&<div className="text-xs text-dim font-mono">{w.phonetic}</div>}
+                </td>
+                <td className="px-4 py-3"><Pill label={w.pos||'?'} color={POS_COLOR[w.pos]||'#aaa'}/></td>
+                <td className="px-4 py-3 text-gold text-sm max-w-48 truncate">
+                  {w.translation||<span className="text-dim italic">Not enriched</span>}
+                </td>
+                <td className="px-4 py-3 text-center"><span className="font-mono text-xs text-violet">×{w.count}</span></td>
+                <td className="px-4 py-3 text-center" onClick={e=>{e.stopPropagation();onStatusChange(w,STATUS_CYCLE[w.status||'new']);}}>
+                  <StatusBadge status={w.status||'new'} onClick={()=>{}}/>
+                </td>
+                <td className="px-4 py-3 text-center" onClick={e=>{e.stopPropagation();speak(w.word,targetLang);}}>
+                  <button className="w-7 h-7 rounded-full border border-border text-neon hover:bg-neon hover:text-white transition-all text-xs flex items-center justify-center mx-auto">▶</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Learning Tab ─────────────────────────────────────────────────────────────
+function LearningTab({words,onWordClick,onStatusChange,onStartStudy,targetLang}) {
+  if (words.length===0) return (
+    <div className="text-center py-16">
+      <div className="text-4xl mb-3">📚</div>
+      <p className="text-dim font-mono text-sm">No words in your Learning list yet.</p>
+      <p className="text-dim font-mono text-xs mt-1">Add words from the Vocabulary tab to start studying.</p>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-dim font-mono">{words.length} words to study</div>
+        <button onClick={onStartStudy} className="px-4 py-2 rounded-xl text-sm font-heading font-semibold transition-all" style={{background:'#7c5cfc',color:'#fff'}}>
+          🃏 Start Study Session
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {words.map(w=>(
+          <div key={w.id||w.word} onClick={()=>onWordClick(w)}
+            className="card-glow rounded-xl border border-border p-4 cursor-pointer transition-all hover:border-violet"
+            style={{background:'#12121f'}}>
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <span className="font-heading font-bold text-white text-lg">{w.word}</span>
+                <span className="ml-2 text-xs font-mono text-dim">{w.phonetic}</span>
+              </div>
+              <div onClick={e=>{e.stopPropagation();speak(w.word,targetLang);}} className="w-7 h-7 rounded-full border border-border text-neon hover:bg-neon hover:text-white transition-all text-xs flex items-center justify-center cursor-pointer">▶</div>
+            </div>
+            <Pill label={w.pos||'?'} color={POS_COLOR[w.pos]||'#aaa'}/>
+            <div className="mt-2 text-sm text-gold">{w.translation||<span className="text-dim italic">Not enriched</span>}</div>
+            {w.contexts?.[0]&&<p className="mt-2 text-xs text-dim italic">"{w.contexts[0]}"</p>}
+            <div className="mt-3 flex gap-2" onClick={e=>e.stopPropagation()}>
+              <button onClick={()=>onStatusChange(w,'new')} className="flex-1 py-1 text-xs rounded-lg border border-border text-dim hover:text-white transition-all">↩ New</button>
+              <button onClick={()=>onStatusChange(w,'mastered')} className="flex-1 py-1 text-xs rounded-lg font-semibold transition-all" style={{background:'#f59e0b22',color:'#f59e0b',border:'1px solid #f59e0b44'}}>★ Master</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Mastered Tab ─────────────────────────────────────────────────────────────
+function MasteredTab({words,onWordClick,onStatusChange,targetLang}) {
+  if (words.length===0) return (
+    <div className="text-center py-16">
+      <div className="text-4xl mb-3">🏆</div>
+      <p className="text-dim font-mono text-sm">No mastered words yet. Keep studying!</p>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-border p-4 flex items-center gap-4" style={{background:'#2a1a1022',borderColor:'#f59e0b33'}}>
+        <div className="text-4xl">🏆</div>
+        <div>
+          <div className="font-heading font-bold text-gold text-xl">{words.length} Words Mastered</div>
+          <div className="text-xs text-dim font-mono">These words are in your long-term memory</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {words.map(w=>(
+          <div key={w.id||w.word} onClick={()=>onWordClick(w)}
+            className="card-glow rounded-xl border p-3 cursor-pointer transition-all"
+            style={{background:'#12121f',borderColor:'#f59e0b22'}}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-heading font-bold text-white">{w.word}</span>
+              <button onClick={e=>{e.stopPropagation();speak(w.word,targetLang);}} className="text-xs text-gold hover:text-white transition-all">▶</button>
+            </div>
+            <div className="text-xs text-dim font-mono mb-1">{w.phonetic}</div>
+            <div className="text-xs text-gold truncate">{w.translation}</div>
+            <div className="mt-2" onClick={e=>e.stopPropagation()}>
+              <button onClick={()=>onStatusChange(w,'learning')} className="text-xs text-dim hover:text-violet transition-all font-mono">↩ Unmaster</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+function LoginScreen({onDemo,googleReady,onGoogleError}) {
+  const btnRef = useRef(null);
+  useEffect(()=>{
+    if(googleReady&&btnRef.current&&window.google?.accounts){
+      window.google.accounts.id.renderButton(btnRef.current,{theme:'filled_black',size:'large',shape:'pill',text:'signin_with',width:280});
+    }
+  },[googleReady]);
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{background:'radial-gradient(ellipse at 50% 30%,#1a1030 0%,#06060c 70%)'}}>
+      <div className="slide-in text-center max-w-md w-full">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5" style={{background:'linear-gradient(135deg,#ff3c5f,#7c5cfc)'}}>🎬</div>
+        <h1 className="text-4xl font-heading font-bold text-white mb-2">Cine<span style={{color:'#ff3c5f'}}>Lang</span></h1>
+        <p className="text-dim font-body mb-2">Learn languages through cinema subtitles</p>
+        <div className="flex flex-wrap gap-2 justify-center mb-8 text-lg">
+          {['🇫🇷','🇩🇪','🇪🇸','🇮🇹','🇯🇵','🇰🇷','🇷🇺','🇵🇹'].map(f=><span key={f}>{f}</span>)}
+        </div>
+        <div className="rounded-2xl border border-border p-6 flex flex-col items-center gap-4" style={{background:'#12121f'}}>
+          {googleReady
+            ? <><div ref={btnRef}/><div className="text-xs text-dim font-mono">— or —</div></>
+            : <div className="text-xs text-dim font-mono mb-2">Set GOOGLE_CLIENT_ID in backend to enable Google Sign-In</div>
+          }
+          <button onClick={onDemo} className="w-70 px-8 py-3 rounded-full font-heading font-semibold text-sm transition-all border" style={{background:'#1a1a2a',color:'#a0a0c0',borderColor:'#2a2a45',width:280}}>
+            🎬 Continue in Demo Mode
+          </button>
+          <p className="text-xs text-dim font-mono text-center">Demo mode uses sample data. Sign in with Google to save your vocabulary across sessions.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+function App() {
+  // Auth
+  const [token,setToken]     = useState(()=>localStorage.getItem('cl_token')||'');
+  const [user,setUser]       = useState(null);
+  const [demoMode,setDemo]   = useState(false);
+  const [googleReady,setGR]  = useState(false);
+
+  // Languages
+  const [srcLang,setSrc]  = useState(()=>localStorage.getItem('cl_src')||'en');
+  const [tgtLang,setTgt]  = useState(()=>localStorage.getItem('cl_tgt')||'fr');
+
+  // Content
+  const [subtitles,setSubs]     = useState([]);
+  const [transSubs,setTrans]    = useState([]);
+  const [vocab,setVocab]        = useState([]);
+  const [loading,setLoad]       = useState(false);
+  const [translating,setTransl] = useState(false);
+  const [online,setOnline]      = useState(false);
+
+  // UI
+  const [tab,setTab]           = useState('dashboard');
+  const [selectedWord,setSelW] = useState(null);
+  const [enriching,setEnr]     = useState(false);
+  const [subIdx,setSubIdx]     = useState(0);
+  const [studyMode,setStudy]   = useState(false);
+  const [toast,setToast]       = useState(null);
+  const [dragOver,setDrag]     = useState(false);
+  const fileRef = useRef();
+
+  const showToast = (msg,type='ok')=>{ setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
+
+  // ── API helper ──
+  const apiFetch = useCallback(async (path,opts={})=>{
+    const headers = {'Content-Type':'application/json',...opts.headers};
+    if(token) headers['Authorization'] = `Bearer ${token}`;
+    const r = await fetch(API+path,{...opts,headers});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  },[token]);
+
+  // ── Health + auth bootstrap ──
+  useEffect(()=>{
+    const check = async ()=>{
+      try {
+        const h = await fetch(API+'/api/health',{signal:AbortSignal.timeout(2500)});
+        setOnline(h.ok);
+        if(h.ok){
+          const cfg = await fetch(API+'/api/config').then(r=>r.json()).catch(()=>({}));
+          if(cfg.google_client_id) {
+            // Load Google GSI and initialise
+            const initGSI = ()=>{
+              window.google?.accounts.id.initialize({client_id:cfg.google_client_id,callback:handleGoogleCB});
+              setGR(true);
+            };
+            if(window.google?.accounts) initGSI();
+            else { const t=setInterval(()=>{if(window.google?.accounts){initGSI();clearInterval(t);}},300); }
+          }
+        }
+      } catch { setOnline(false); }
+    };
+    check();
+    const iv = setInterval(check,20000);
+    return ()=>clearInterval(iv);
+  },[]);
+
+  // ── Validate existing token ──
+  useEffect(()=>{
+    if(!token||demoMode) return;
+    apiFetch('/api/auth/me').then(u=>{
+      setUser(u);
+      return apiFetch(`/api/vocabulary?target_lang=${tgtLang}`);
+    }).then(data=>{
+      if(data?.length) setVocab(data);
+      else setVocab(getSeedVocab(tgtLang));
+    }).catch(()=>{
+      localStorage.removeItem('cl_token'); setToken('');
+      setVocab(getSeedVocab(tgtLang));
+    });
+  },[token]);
+
+  // ── Seed data on demo ──
+  useEffect(()=>{
+    if(demoMode){ setSubs(getSeedSubs(tgtLang)); setTrans(getSeedSubs(tgtLang)); setVocab(getSeedVocab(tgtLang)); }
+  },[demoMode,tgtLang]);
+
+  function handleGoogleCB({credential}){
+    apiFetch('/api/auth/google',{method:'POST',body:JSON.stringify({id_token:credential})})
+      .then(res=>{ localStorage.setItem('cl_token',res.token); setToken(res.token); setUser(res.user); showToast(`Welcome, ${res.user.name}!`); })
+      .catch(e=>showToast('Google sign-in failed: '+e.message,'err'));
+  }
+
+  function logout(){
+    localStorage.removeItem('cl_token'); setToken(''); setUser(null); setDemo(false);
+    setVocab([]); setSubs([]); setTrans([]);
+  }
+
+  function enterDemo(){
+    setDemo(true); setUser({id:0,name:'Demo User',email:'demo@cinelang.app',picture:null});
+  }
+
+  // ── SRT upload ──
+  async function handleFile(file){
+    if(!file||!file.name.endsWith('.srt')){ showToast('Please upload a .srt subtitle file','err'); return; }
+    const content = await file.text();
+    if(!online){ showToast('Backend offline — using demo mode','warn'); return; }
+    setLoad(true);
+    try {
+      const {subtitles:s} = await apiFetch('/api/parse-srt',{method:'POST',body:JSON.stringify({content})});
+      setSubs(s); setTrans([]); setVocab([]); setSubIdx(0);
+      showToast(`✓ Loaded "${file.name}" — ${s.length} frames. Click Translate to begin.`);
+    } catch(e){ showToast('Parse failed: '+e.message,'err'); }
+    finally { setLoad(false); }
+  }
+
+  // ── Translate ──
+  async function translate(){
+    if(!online){ showToast('Backend required for translation','warn'); return; }
+    if(!subtitles.length){ showToast('Upload an SRT file first','warn'); return; }
+    setTransl(true);
+    try {
+      const res = await apiFetch('/api/translate-subtitles',{
+        method:'POST',
+        body:JSON.stringify({subtitles,source_lang:srcLang,target_lang:tgtLang,auto_detect:false}),
+      });
+      setTrans(res.translated);
+      // Merge new vocab with existing
+      setVocab(prev=>{
+        const map = Object.fromEntries(prev.map(w=>[w.word,w]));
+        res.vocabulary.forEach(v=>{ if(!map[v.word]) map[v.word]=v; });
+        return Object.values(map);
+      });
+      showToast(`✓ Translated ${res.subtitle_count} frames — ${res.vocab_count} words extracted`);
+    } catch(e){ showToast('Translation failed: '+e.message,'err'); }
+    finally { setTransl(false); }
+  }
+
+  // ── Enrich word ──
+  async function enrich(word){
+    if(!online){ showToast('Enrichment requires backend connection','warn'); return; }
+    setEnr(true);
+    try {
+      const res = await apiFetch('/api/enrich-word',{
+        method:'POST',
+        body:JSON.stringify({word:word.word,sentence:word.contexts?.[0]||'',source_lang:srcLang,target_lang:tgtLang}),
+      });
+      updateWord(word,{...res});
+      setSelW(prev=>prev?{...prev,...res}:prev);
+      showToast(`✨ "${word.word}" enriched`);
+    } catch(e){ showToast('Enrich failed: '+e.message,'err'); }
+    finally { setEnr(false); }
+  }
+
+  // ── Status change ──
+  async function changeStatus(word,newStatus){
+    updateWord(word,{status:newStatus});
+    if(selWord?.word===word.word) setSelW(prev=>prev?{...prev,status:newStatus}:prev);
+    if(online&&user&&user.id&&word.id>0){
+      try { await apiFetch(`/api/vocabulary/${word.id}/status`,{method:'PATCH',body:JSON.stringify({status:newStatus})}); }
+      catch {}
+    }
+  }
+
+  function updateWord(word,patch){
+    setVocab(prev=>prev.map(w=>(w.word===word.word&&w.target_lang===word.target_lang)?{...w,...patch}:w));
+  }
+
+  // ── Language change ──
+  function changeTgt(code){
+    setTgt(code); localStorage.setItem('cl_tgt',code);
+    if(demoMode){ setSubs(getSeedSubs(code)); setTrans(getSeedSubs(code)); setVocab(getSeedVocab(code)); }
+  }
+
+  // ── Stats ──
+  const total    = vocab.length;
+  const mastered = vocab.filter(w=>w.status==='mastered').length;
+  const learning = vocab.filter(w=>w.status==='learning').length;
+  const newW     = total - mastered - learning;
+  const fluency  = total>0 ? Math.round((mastered*100+learning*50)/total) : 0;
+
+  const stackData = total>0 ? [
+    {label:'Mastered',pct:mastered/total*100,color:'#f59e0b'},
+    {label:'Learning',pct:learning/total*100,color:'#34d399'},
+    {label:'New',     pct:newW/total*100,    color:'#7c5cfc'},
+  ] : [{label:'None',pct:100,color:'#2a2a45'}];
+
+  const learningWords = vocab.filter(w=>w.status==='learning');
+  const masteredWords = vocab.filter(w=>w.status==='mastered');
+
+  // Display subtitles: prefer translated, fall back to original
+  const displaySubs = transSubs.length>0 ? transSubs : subtitles.map(s=>({...s,original:null}));
+
+  // Show login if not authed and not demo
+  if(!user&&!demoMode) return (
+    <>
+      {toast&&<Toast {...toast}/>}
+      <LoginScreen onDemo={enterDemo} googleReady={googleReady}/>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{fontFamily:"'Instrument Sans',sans-serif"}}>
+      {toast&&<Toast {...toast}/>}
+      {selectedWord&&<WordModal word={selectedWord} onClose={()=>setSelW(null)} onStatusChange={changeStatus} onEnrich={enrich} enriching={enriching} targetLang={tgtLang}/>}
+      {studyMode&&<StudyMode words={learningWords} onClose={()=>setStudy(false)}
+        onGotIt={w=>changeStatus(w,'mastered')} onKeepLearning={w=>changeStatus(w,'learning')}/>}
+
+      {/* Header */}
+      <header className="border-b border-border px-5 py-3 flex items-center justify-between sticky top-0 z-30 glass">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base" style={{background:'linear-gradient(135deg,#ff3c5f,#7c5cfc)'}}>🎬</div>
+          <span className="text-lg font-heading font-bold text-white tracking-tight">Cine<span style={{color:'#ff3c5f'}}>Lang</span></span>
+          <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${online?'text-teal border-teal':'text-gold border-gold'}`}
+            style={{borderColor:online?'#00d4aa33':'#f5c84233',background:online?'#00d4aa11':'#f5c84211'}}>
+            {online?'● Live':'◉ Sandbox'}
+            {demoMode&&!online&&' · Demo'}
+          </span>
+        </div>
+
+        {/* Language selectors */}
+        <div className="hidden sm:flex items-center gap-2">
+          <select value={srcLang} onChange={e=>setSrc(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-border bg-surface text-xs text-gray-200 outline-none font-mono cursor-pointer">
+            {LANGS.map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+          </select>
+          <span className="text-dim text-sm">→</span>
+          <select value={tgtLang} onChange={e=>changeTgt(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-neon bg-surface text-xs text-gray-200 outline-none font-mono cursor-pointer" style={{borderColor:'#ff3c5f55'}}>
+            {LANGS.filter(l=>l.code!==srcLang).map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+          </select>
+          <button onClick={translate} disabled={translating||!subtitles.length}
+            className="px-3 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all"
+            style={{background:translating?'#2a2a45':'#ff3c5f',color:'#fff',opacity:(!subtitles.length||translating)?.6:1}}>
+            {translating?'⏳ Translating…':'⚡ Translate'}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={()=>fileRef.current?.click()} className="px-3 py-1.5 rounded-lg text-xs font-heading border border-border text-dim hover:text-white transition-all">↑ SRT</button>
+          <button onClick={()=>exportAnki(vocab)} className="px-3 py-1.5 rounded-lg text-xs font-heading border border-neon text-neon hover:bg-neon hover:text-white transition-all">↓ Anki</button>
+          {user&&(
+            <div className="flex items-center gap-2 pl-2 border-l border-border">
+              {user.picture
+                ? <img src={user.picture} className="w-7 h-7 rounded-full" alt=""/>
+                : <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-heading font-bold text-white" style={{background:'#7c5cfc'}}>{user.name?.[0]}</div>
+              }
+              <span className="text-xs font-body text-dim hidden md:inline max-w-24 truncate">{user.name}</span>
+              <button onClick={logout} className="text-xs text-dim hover:text-neon transition-all font-mono">Sign out</button>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept=".srt" onChange={e=>handleFile(e.target.files?.[0])}/>
+        </div>
+      </header>
+
+      {/* Body */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-0">
+        {/* LEFT sidebar */}
+        <aside className="p-4 flex flex-col gap-4 border-r border-border" style={{background:'#0b0b16'}}>
+          {/* Offline notice */}
+          {!online&&<div className="rounded-xl border p-3 text-xs font-mono" style={{background:'#f5c84211',borderColor:'#f5c84233',color:'#f5c842'}}>
+            ◉ Sandbox Mode — Start the FastAPI server to translate real subtitles.
+          </div>}
+
+          {/* Mobile lang selectors */}
+          <div className="flex sm:hidden gap-2 items-center">
+            <select value={srcLang} onChange={e=>setSrc(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-surface text-xs text-gray-200 outline-none font-mono cursor-pointer">
+              {LANGS.map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+            </select>
+            <span className="text-dim">→</span>
+            <select value={tgtLang} onChange={e=>changeTgt(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-neon bg-surface text-xs text-gray-200 outline-none font-mono cursor-pointer" style={{borderColor:'#ff3c5f55'}}>
+              {LANGS.filter(l=>l.code!==srcLang).map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+            </select>
+            <button onClick={translate} disabled={translating||!subtitles.length} className="px-2 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all" style={{background:'#ff3c5f',color:'#fff'}}>⚡</button>
+          </div>
+
+          {/* Drop zone */}
+          <div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
+            onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files?.[0]);}}
+            onClick={()=>fileRef.current?.click()}
+            className="rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all"
+            style={{borderColor:dragOver?'#ff3c5f':'#2a2a45',background:dragOver?'#ff3c5f08':'#0d0d1a'}}>
+            <div className="text-2xl mb-1">🎬</div>
+            <div className="text-xs text-dim font-mono">Drop .srt file or click to browse</div>
+            {loading&&<div className="mt-2 shimmer h-1 rounded-full"/>}
+          </div>
+
+          {/* Player */}
+          <SubtitlePlayer subtitles={displaySubs} vocab={vocab} targetLang={tgtLang}
+            onSeek={w=>{const f=vocab.find(v=>v.word===w);if(f)setSelW(f);}}
+            currentIdx={subIdx} setCurrentIdx={setSubIdx}/>
+
+          {/* Study ratio */}
+          <div className="rounded-xl border border-border p-4" style={{background:'#0d0d1a'}}>
+            <div className="text-xs text-dim font-mono uppercase tracking-widest mb-3">Study Ratio</div>
+            <StackedBar data={stackData}/>
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {[{label:'Mastered',color:'#f59e0b',val:mastered},{label:'Learning',color:'#34d399',val:learning},{label:'New',color:'#7c5cfc',val:newW}].map(d=>(
+                <div key={d.label} className="flex items-center gap-1.5 text-xs font-mono">
+                  <span className="w-2 h-2 rounded-full" style={{background:d.color}}/>
+                  <span style={{color:d.color}}>{d.val}</span>
+                  <span className="text-dim">{d.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* RIGHT content */}
+        <section className="p-5 flex flex-col gap-5 overflow-auto">
+          {/* Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <MetricCard label="Mined Words" value={total} sub={`${langLabel(tgtLang)}`} color="neon" icon="⛏"/>
+            <MetricCard label="Mastered" value={mastered} sub="long-term" color="gold" icon="★"/>
+            <MetricCard label="Learning" value={learning} sub="active study" color="violet" icon="◎"/>
+            <MetricCard label="Fluency" value={`${fluency}%`} sub="weighted score" color="teal" icon="◈"/>
+          </div>
+
+          {/* Fluency bar */}
+          <div className="rounded-xl border border-border p-4" style={{background:'#12121f'}}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-mono text-dim uppercase tracking-widest">Fluency Progression — {langLabel(tgtLang)}</span>
+              <span className="text-xs font-mono text-teal">{fluency}%</span>
+            </div>
+            <ProgressBar pct={fluency} color="#00d4aa"/>
+            <div className="flex justify-between mt-1 text-xs text-dim font-mono"><span>Beginner</span><span>Intermediate</span><span>Fluent</span></div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-4 border-b border-border">
+            {[['dashboard','📊 Dashboard'],['vocab','📖 Vocabulary'],['learning',`📚 Learning (${learning})`],['mastered',`🏆 Mastered (${mastered})`]].map(([id,label])=>(
+              <button key={id} onClick={()=>setTab(id)} className={`pb-2 text-sm font-heading font-semibold transition-all whitespace-nowrap ${tab===id?'tab-on':'tab-off'}`}>{label}</button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          {tab==='dashboard'&&(
+            <div className="flex flex-col gap-4">
+              {/* Subtitle log */}
+              <div className="rounded-xl border border-border overflow-hidden" style={{background:'#0d0d1a'}}>
+                <div className="px-4 py-3 border-b border-border text-xs text-dim font-mono uppercase tracking-widest">Subtitle Log</div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-dim text-xs font-mono uppercase">
+                      <th className="px-4 py-2 text-left w-8">#</th>
+                      <th className="px-4 py-2 text-left">Time</th>
+                      <th className="px-4 py-2 text-left">Original</th>
+                      <th className="px-4 py-2 text-left">{langLabel(tgtLang)}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displaySubs.slice(0,20).map((s,i)=>{
+                      const ws = new Set(vocab.map(v=>v.word));
+                      return <tr key={s.index} onClick={()=>setSubIdx(i)} className={`border-b border-border cursor-pointer hover:bg-surface transition-all ${i===subIdx?'bg-surface':''}`}>
+                        <td className="px-4 py-2 text-dim font-mono text-xs">{s.index}</td>
+                        <td className="px-4 py-2 font-mono text-xs" style={{color:'#7c5cfc'}}>{s.start?.slice(0,8)}</td>
+                        <td className="px-4 py-2 text-dim text-xs italic">{s.original||'—'}</td>
+                        <td className="px-4 py-2 leading-relaxed text-xs">
+                          {s.text.split(/(\s+)/).map((p,j)=>{
+                            const cl=p.toLowerCase().replace(/[^a-zàâäéèêëïîôùûüÿæœçñßäöü]/g,'');
+                            return ws.has(cl)?<span key={j} className="kw" onClick={e=>{e.stopPropagation();const f=vocab.find(v=>v.word===cl);if(f)setSelW(f);}}>{p}</span>:<span key={j}>{p}</span>;
+                          })}
+                        </td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {tab==='vocab'&&(
+            <VocabTable vocab={vocab} onWordClick={setSelW} onStatusChange={changeStatus} targetLang={tgtLang}/>
+          )}
+
+          {tab==='learning'&&(
+            <LearningTab words={learningWords} onWordClick={setSelW} onStatusChange={changeStatus}
+              onStartStudy={()=>setStudy(true)} targetLang={tgtLang}/>
+          )}
+
+          {tab==='mastered'&&(
+            <MasteredTab words={masteredWords} onWordClick={setSelW} onStatusChange={changeStatus} targetLang={tgtLang}/>
+          )}
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border px-5 py-2.5 flex items-center justify-between" style={{background:'#0b0b16'}}>
+        <span className="text-xs text-dim font-mono">CineLang v2 · Gemini 2.5 Flash · {langLabel(srcLang)} → {langLabel(tgtLang)}</span>
+        <span className="text-xs font-mono flex items-center gap-1" style={{color:online?'#00d4aa':'#f5c842'}}>
+          {online?<>● Live<EqWave/></>:'◉ Offline'}
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
