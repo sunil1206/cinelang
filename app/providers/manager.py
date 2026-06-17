@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from threading import Lock
 
 from app.providers.base import BaseProvider, VocabResult, TranslationResult
+from app.providers.mistral_provider import MistralProvider
 from app.providers.anthropic_provider import AnthropicProvider
 from app.providers.openai_provider import OpenAIProvider
 from app.providers.groq_provider import GroqProvider
@@ -88,14 +89,15 @@ class ProviderManager:
 
     def __init__(self):
         self._providers: list[BaseProvider] = [
-            GroqProvider(),        # 1 — Llama 3.3 70B (FREE, fast, primary)
-            OpenRouterProvider(),  # 2 — free models (Gemma 4 31B, no cost)
+            MistralProvider(),     # 1 — Mistral Nemo (PRIMARY — best French quality)
+            OpenRouterProvider(),  # 2 — Mistral Nemo via OpenRouter (free fallback)
             DictionaryProvider(),  # 3 — MyMemory + FreeDictionary + Wiktionary (no key)
             OfflineProvider(),     # 4 — offline dict + Google Translate
-            GeminiProvider(),      # 5 — Gemini (if key is valid)
-            OpenAIProvider(),      # 6 — gpt-4o-mini (paid, last resort)
-            AnthropicProvider(),   # 7 — Claude (if key set)
-            OllamaProvider(),      # 8 — local Ollama
+            GroqProvider(),        # 5 — Groq LLaMA (if key valid)
+            GeminiProvider(),      # 6 — Gemini (if key valid)
+            OpenAIProvider(),      # 7 — GPT-4o-mini (paid, last resort)
+            AnthropicProvider(),   # 8 — Claude (if key set)
+            OllamaProvider(),      # 9 — local Ollama
         ]
         self._breakers: dict[str, CircuitBreaker] = {
             p.name.value: CircuitBreaker() for p in self._providers

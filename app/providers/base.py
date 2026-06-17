@@ -7,6 +7,7 @@ from typing import Any
 
 
 class ProviderName(str, Enum):
+    MISTRAL     = "mistral"
     ANTHROPIC   = "anthropic"
     OPENAI      = "openai"
     GROQ        = "groq"

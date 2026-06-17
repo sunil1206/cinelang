@@ -28,7 +28,11 @@ class Settings(BaseSettings):
     # ── Google OAuth ──────────────────────────────────────────────────────────
     google_client_id: str = ""
 
-    # ── AI Provider 0: Anthropic Claude Haiku (PRIMARY) ─────────────────────
+    # ── AI Provider 0: Mistral (PRIMARY — best French quality) ──────────────
+    mistral_api_key: str = ""
+    mistral_model: str   = "mistral-nemo-latest"   # near-zero cost, great French
+
+    # ── AI Provider 1: Anthropic Claude Haiku ────────────────────────────────
     anthropic_api_key: str = ""
 
     # ── AI Provider 1: OpenAI gpt-4o-mini ───────────────────────────────────
