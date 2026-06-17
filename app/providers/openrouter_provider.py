@@ -37,7 +37,8 @@ Return ONLY valid JSON: {{"translations": [{{"index": 1, "text": "translated"}}]
 Lines:
 {lines}"""
 
-_FREE_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+_FREE_MODEL  = "mistralai/mistral-nemo"          # near-zero cost, best French quality
+_FALLBACK_MODEL = "meta-llama/llama-3.3-70b-instruct:free"  # free fallback
 _BASE_URL   = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -51,11 +52,11 @@ class OpenRouterProvider(BaseProvider):
         key = self._settings.openrouter_api_key
         return bool(key and len(key) > 10)
 
-    def _call(self, prompt: str, max_tokens: int = 1024) -> str:
+    def _call(self, prompt: str, max_tokens: int = 1024, model: str = _FREE_MODEL) -> str:
         r = httpx.post(
             _BASE_URL,
             json={
-                "model": _FREE_MODEL,
+                "model": model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": max_tokens,
                 "temperature": 0.1,
@@ -65,8 +66,11 @@ class OpenRouterProvider(BaseProvider):
                 "HTTP-Referer": "https://cinelang.app",
                 "X-Title": "CineLang",
             },
-            timeout=20,
+            timeout=25,
         )
+        if r.status_code == 429 and model == _FREE_MODEL:
+            # Rate-limited on primary — retry with free fallback
+            return self._call(prompt, max_tokens, model=_FALLBACK_MODEL)
         if r.status_code in (400, 401, 403):
             raise RuntimeError(f"OpenRouter rejected ({r.status_code}): {r.text[:200]}")
         r.raise_for_status()
@@ -103,7 +107,7 @@ class OpenRouterProvider(BaseProvider):
             is_idiom=bool(data.get("isIdiom", False)),
             is_slang=bool(data.get("isSlang", False)),
             explanation=data.get("explanation", ""),
-            provider="openrouter/llama-3.3-70b",
+            provider="openrouter/mistral-nemo",
         )
 
     def translate_batch(self, blocks, source_lang, target_lang) -> TranslationResult:
@@ -113,4 +117,4 @@ class OpenRouterProvider(BaseProvider):
         raw   = self._call(_TRANSLATE_PROMPT.format(src=src, tgt=tgt, lines=lines), max_tokens=2048)
         data  = json.loads(raw)
         translations = data if isinstance(data, list) else data.get("translations", [])
-        return TranslationResult(translations=translations, provider="openrouter/llama-3.3-70b")
+        return TranslationResult(translations=translations, provider="openrouter/mistral-nemo")
