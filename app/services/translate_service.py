@@ -66,12 +66,12 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     if _STAGE_RE.match(stripped):
         return text
 
-    # DeepL → MyMemory → Google Translate
-    result = _deepl(stripped, source_lang, target_lang)
+    # Google Translate (primary, free) → MyMemory → DeepL (if key valid)
+    result = _google(stripped, source_lang, target_lang)
     if not result:
         result = _mymemory(stripped, source_lang, target_lang)
     if not result:
-        result = _google(stripped, source_lang, target_lang)
+        result = _deepl(stripped, source_lang, target_lang)
     return result or text
 
 

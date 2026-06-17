@@ -1,23 +1,194 @@
 'use client'
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { GraduationCap, Play } from 'lucide-react'
+import { GraduationCap, Play, Plus, X, Loader2, Sparkles } from 'lucide-react'
 import StudyMode from '@/components/StudyMode'
 import WordModal from '@/components/WordModal'
 import { PosBadge, StatusBadge } from '@/components/ui/Badge'
 import { useCineLang } from '@/lib/store'
-import { setVocabStatus, enrichWord } from '@/lib/api'
-import { STATUS_CYCLE, type VocabEntry, type VocabStatus } from '@/lib/types'
+import { setVocabStatus, enrichWord, manualAddWord } from '@/lib/api'
+import { STATUS_CYCLE, type VocabEntry, type VocabStatus, LANGUAGES } from '@/lib/types'
 import clsx from 'clsx'
 
+// ── Add Word Modal ─────────────────────────────────────────────────────────────
+function AddWordModal({
+  sourceLang, targetLang, token,
+  onAdded, onClose,
+}: {
+  sourceLang: string; targetLang: string; token: string | null
+  onAdded: (entry: VocabEntry) => void
+  onClose: () => void
+}) {
+  const [word,        setWord]        = useState('')
+  const [translation, setTranslation] = useState('')
+  const [phonetic,    setPhonetic]    = useState('')
+  const [explanation, setExplanation] = useState('')
+  const [enriching,   setEnriching]   = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+
+  const srcLabel = LANGUAGES.find(l => l.code === sourceLang)?.label ?? sourceLang
+  const tgtLabel = LANGUAGES.find(l => l.code === targetLang)?.label ?? targetLang
+
+  async function handleAutoFill() {
+    if (!word.trim()) { setError('Enter a word first'); return }
+    if (!token)       { setError('Sign in to use auto-fill'); return }
+    setEnriching(true); setError('')
+    try {
+      const res = await enrichWord(word.trim(), '', sourceLang, targetLang, token)
+      if (res.translation)  setTranslation(res.translation)
+      if (res.phonetic)     setPhonetic(res.phonetic)
+      if (res.explanation)  setExplanation(res.explanation)
+    } catch (e: any) {
+      setError(e.message || 'Auto-fill failed')
+    } finally {
+      setEnriching(false)
+    }
+  }
+
+  async function handleSave() {
+    if (!word.trim())        { setError('Word is required'); return }
+    if (!translation.trim()) { setError('Translation is required'); return }
+    if (!token)              { setError('Sign in to save words'); return }
+    setSaving(true); setError('')
+    try {
+      const res = await manualAddWord(
+        word.trim(), translation.trim(),
+        sourceLang, targetLang,
+        phonetic.trim(), explanation.trim(), token,
+      )
+      // Set status to 'learning' immediately
+      if (res.id > 0) {
+        try { await setVocabStatus(res.id, 'learning', token) } catch {}
+      }
+      onAdded({
+        id: res.id, word: res.word,
+        source_lang: sourceLang, target_lang: targetLang,
+        translation: translation.trim(),
+        phonetic: phonetic.trim() || null,
+        explanation: explanation.trim() || null,
+        status: 'learning',
+        pos: null, count: 1, contexts: [], timestamps: [],
+      })
+    } catch (e: any) {
+      setError(e.message || 'Failed to save word')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(30,20,10,0.45)' }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-heading font-bold text-warm-900 text-lg">Add Word to Learning</h2>
+          <button onClick={onClose} className="btn-icon p-1.5"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="space-y-3">
+          {/* Language hint */}
+          <p className="text-xs text-warm-400 font-mono">
+            {srcLabel} → {tgtLabel}
+          </p>
+
+          {/* Word input + auto-fill */}
+          <div>
+            <label className="block text-xs font-medium text-warm-600 mb-1">Word *</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={`Word in ${srcLabel}`}
+                value={word}
+                onChange={e => setWord(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAutoFill()}
+                className="flex-1 px-3 py-2 rounded-xl border border-warm-200 bg-cream-50 text-warm-900 text-sm placeholder:text-warm-300 focus:outline-none focus:ring-2 focus:ring-cinema-300"
+              />
+              <button
+                onClick={handleAutoFill}
+                disabled={enriching || !word.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-all disabled:opacity-50"
+              >
+                {enriching
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Sparkles className="w-3.5 h-3.5" />}
+                {enriching ? 'Filling…' : 'Auto-fill'}
+              </button>
+            </div>
+          </div>
+
+          {/* Translation */}
+          <div>
+            <label className="block text-xs font-medium text-warm-600 mb-1">
+              Translation * <span className="text-warm-300">(in {tgtLabel})</span>
+            </label>
+            <input
+              type="text"
+              placeholder={`Meaning in ${tgtLabel}`}
+              value={translation}
+              onChange={e => setTranslation(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-warm-200 bg-cream-50 text-warm-900 text-sm placeholder:text-warm-300 focus:outline-none focus:ring-2 focus:ring-cinema-300"
+            />
+          </div>
+
+          {/* Phonetic */}
+          <div>
+            <label className="block text-xs font-medium text-warm-600 mb-1">Pronunciation <span className="text-warm-300">(IPA, optional)</span></label>
+            <input
+              type="text"
+              placeholder="e.g. /bɔ̃ʒuʁ/"
+              value={phonetic}
+              onChange={e => setPhonetic(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-warm-200 bg-cream-50 text-warm-900 text-sm font-mono placeholder:text-warm-300 focus:outline-none focus:ring-2 focus:ring-cinema-300"
+            />
+          </div>
+
+          {/* Explanation */}
+          <div>
+            <label className="block text-xs font-medium text-warm-600 mb-1">Note / Example <span className="text-warm-300">(optional)</span></label>
+            <textarea
+              rows={2}
+              placeholder="Usage note or example sentence…"
+              value={explanation}
+              onChange={e => setExplanation(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-warm-200 bg-cream-50 text-warm-900 text-sm placeholder:text-warm-300 focus:outline-none focus:ring-2 focus:ring-cinema-300 resize-none"
+            />
+          </div>
+
+          {error && <p className="text-red-500 text-xs px-1">{error}</p>}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-warm-200 text-warm-600 text-sm font-medium hover:bg-cream-100 transition-all">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !word.trim() || !translation.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cinema-500 text-white text-sm font-medium hover:bg-cinema-600 transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {saving ? 'Saving…' : 'Add to Learning'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Learn Page ─────────────────────────────────────────────────────────────────
 export default function LearnPage() {
   const { data: session } = useSession()
-  const { vocab, updateVocabStatus, patchVocabEntry, targetLang, sourceLang, backendToken, showToast } = useCineLang()
+  const { vocab, updateVocabStatus, patchVocabEntry, mergeVocab, targetLang, sourceLang, backendToken, showToast } = useCineLang()
   const token = (session as any)?.backendToken ?? backendToken
 
   const [studying,     setStudying]     = useState(false)
   const [selectedWord, setSelectedWord] = useState<VocabEntry | null>(null)
   const [enriching,    setEnriching]    = useState(false)
+  const [showAdd,      setShowAdd]      = useState(false)
 
   const learningWords = vocab.filter((w) => w.status === 'learning' || w.status === 'new')
   const readyCount    = learningWords.filter((w) => w.status === 'learning').length
@@ -40,6 +211,12 @@ export default function LearnPage() {
       showToast(`✨ "${word.word}" enriched`)
     } catch (e: any) { showToast(e.message, 'err') }
     finally { setEnriching(false) }
+  }
+
+  function handleWordAdded(entry: VocabEntry) {
+    mergeVocab([entry])
+    setShowAdd(false)
+    showToast(`✓ "${entry.word}" added to Learning`)
   }
 
   if (studying) {
@@ -65,23 +242,34 @@ export default function LearnPage() {
             {learningWords.length} words queued · {readyCount} in active study
           </p>
         </div>
-        <button
-          onClick={() => {
-            if (!learningWords.length) { showToast('No words in your learning list yet', 'warn'); return }
-            setStudying(true)
-          }}
-          className="btn-primary">
-          <Play className="w-4 h-4" /> Start Study Session
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-warm-200 bg-white text-warm-700 text-sm font-medium hover:bg-cream-100 transition-all">
+            <Plus className="w-4 h-4" /> Add Word
+          </button>
+          <button
+            onClick={() => {
+              if (!learningWords.length) { showToast('No words in your learning list yet', 'warn'); return }
+              setStudying(true)
+            }}
+            className="btn-primary">
+            <Play className="w-4 h-4" /> Start Study Session
+          </button>
+        </div>
       </div>
 
       {learningWords.length === 0 ? (
         <div className="card p-12 text-center">
           <GraduationCap className="w-12 h-12 text-warm-300 mx-auto mb-3" />
           <p className="font-heading font-semibold text-warm-700 text-lg mb-1">Nothing to study yet</p>
-          <p className="text-sm text-warm-400">
-            Go to the Dashboard, click any word in the vocabulary table, and mark it as "Learning".
+          <p className="text-sm text-warm-400 mb-5">
+            Add a word manually or mark any vocabulary word as "Learning" from the Dashboard.
           </p>
+          <button onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cinema-500 text-white text-sm font-medium hover:bg-cinema-600 transition-all">
+            <Plus className="w-4 h-4" /> Add Your First Word
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -92,7 +280,7 @@ export default function LearnPage() {
               <div className="flex items-start justify-between mb-3">
                 <PosBadge pos={word.pos} />
                 <StatusBadge status={word.status}
-                  onClick={(e) => { e?.stopPropagation(); changeStatus(word, STATUS_CYCLE[word.status]) }} />
+                  onClick={() => changeStatus(word, STATUS_CYCLE[word.status])} />
               </div>
               <p className="font-heading font-bold text-warm-900 text-xl mb-0.5 group-hover:text-cinema-600 transition-colors">
                 {word.word}
@@ -118,6 +306,14 @@ export default function LearnPage() {
               </div>
             </button>
           ))}
+
+          {/* Inline add card */}
+          <button
+            onClick={() => setShowAdd(true)}
+            className="card-sm p-5 border-2 border-dashed border-warm-200 flex flex-col items-center justify-center gap-2 text-warm-400 hover:border-cinema-300 hover:text-cinema-500 hover:bg-cinema-50/30 transition-all min-h-[140px]">
+            <Plus className="w-6 h-6" />
+            <span className="text-sm font-medium">Add word</span>
+          </button>
         </div>
       )}
 
@@ -126,6 +322,16 @@ export default function LearnPage() {
           onClose={() => setSelectedWord(null)}
           onEnrich={handleEnrich}
           onStatusChange={changeStatus} />
+      )}
+
+      {showAdd && (
+        <AddWordModal
+          sourceLang={sourceLang}
+          targetLang={targetLang}
+          token={token}
+          onAdded={handleWordAdded}
+          onClose={() => setShowAdd(false)}
+        />
       )}
     </div>
   )

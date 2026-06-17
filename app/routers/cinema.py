@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, get_optional_user
 from app.models.movie import Movie
 from app.models.vocabulary import VocabEntry
 from app.models.user import User
@@ -60,9 +60,11 @@ class MoviePatch(BaseModel):
 @router.get("", response_model=list[MovieOut])
 def list_movies(
     db:           Session = Depends(get_db),
-    current_user: User    = Depends(get_current_user),
+    current_user: User    = Depends(get_optional_user),
 ):
     """Return all movies in the user's cinema library, most recent first."""
+    if not current_user:
+        return []
     movies = (
         db.query(Movie)
         .filter(Movie.user_id == current_user.id)

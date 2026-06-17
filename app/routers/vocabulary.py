@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.dependencies import CurrentUser, DBSession
+from app.dependencies import CurrentUser, OptionalCurrentUser, DBSession
 from app.schemas.vocabulary import (
     EnrichOut, EnrichRequest,
     VocabOut, VocabStatusUpdate, VocabUpsertRequest,
@@ -95,37 +95,50 @@ def update_meaning(vocab_id: int, body: ManualMeaningUpdate, current_user: Curre
 
 
 @router.post("/manual-add", summary="Manually add a word with meaning")
-def manual_add_word(body: ManualAddWord, current_user: CurrentUser, db: DBSession):
-    from app.models.vocabulary import VocabEntry
+def manual_add_word(body: ManualAddWord, current_user: OptionalCurrentUser, db: DBSession):
     word = body.word.lower().strip()
     if not word:
         raise HTTPException(400, "Word is required")
-    # Check duplicate
+
+    # Auto-enrich if no translation provided (works without auth)
+    translation  = body.translation or ""
+    phonetic     = body.phonetic or ""
+    explanation  = body.explanation or ""
+    if not translation:
+        try:
+            from app.routers.extract import _translate_word
+            from app.providers.dictionary_provider import _free_dict_lookup, _wiktionary_lookup
+            translation = _translate_word(word, body.source_lang, body.target_lang)
+            dd = _wiktionary_lookup(word, body.source_lang) or _free_dict_lookup(word)
+            phonetic    = dd.get("phonetic", "") or phonetic
+            explanation = dd.get("definition", "") or explanation
+        except Exception:
+            pass
+
+    # No user — return enriched result without saving to DB
+    if not current_user:
+        return {"id": 0, "word": word, "translation": translation,
+                "phonetic": phonetic, "explanation": explanation, "status": "guest"}
+
+    from app.models.vocabulary import VocabEntry
     existing = db.query(VocabEntry).filter(
         VocabEntry.user_id == current_user.id,
         VocabEntry.word == word,
         VocabEntry.target_lang == body.target_lang,
     ).first()
     if existing:
-        # Update meaning if provided
-        if body.translation:
-            existing.translation = body.translation
-        if body.phonetic:
-            existing.phonetic = body.phonetic
-        if body.explanation:
-            existing.explanation = body.explanation
-        if body.example_sentence:
-            existing.example_sentence = body.example_sentence
+        if body.translation: existing.translation = body.translation
+        if body.phonetic:    existing.phonetic    = body.phonetic
+        if body.explanation: existing.explanation = body.explanation
+        if body.example_sentence: existing.example_sentence = body.example_sentence
         db.commit()
-        return {"id": existing.id, "word": existing.word, "status": "updated"}
+        return {"id": existing.id, "word": existing.word, "translation": existing.translation, "status": "updated"}
 
     entry = VocabEntry(
         user_id=current_user.id,
         word=word, lemma=word,
         source_lang=body.source_lang, target_lang=body.target_lang,
-        translation=body.translation,
-        phonetic=body.phonetic or "",
-        explanation=body.explanation or "",
+        translation=translation, phonetic=phonetic, explanation=explanation,
         example_sentence=body.example_sentence or "",
         status="new", count=1,
         movie_id=body.movie_id, book_id=body.book_id,
@@ -133,18 +146,7 @@ def manual_add_word(body: ManualAddWord, current_user: CurrentUser, db: DBSessio
     )
     db.add(entry)
     db.flush()
-    # Auto-enrich if no translation provided
-    if not body.translation:
-        try:
-            from app.providers.manager import provider_manager
-            result = provider_manager.enrich_word(word, word, "", body.source_lang, body.target_lang)
-            entry.translation = result.get("translation", "")
-            entry.phonetic    = result.get("phonetic", "")
-            entry.explanation = result.get("explanation", "")
-        except Exception:
-            pass
     db.commit()
-    # Sync to UserVocab
     try:
         from app.services.user_vocab_service import sync_to_user_vocab
         sync_to_user_vocab(
@@ -160,38 +162,62 @@ def manual_add_word(body: ManualAddWord, current_user: CurrentUser, db: DBSessio
 
 
 @router.post("/enrich", response_model=EnrichOut, summary="Enrich a word (Groq → Gemini → Ollama → offline)")
-def enrich_word(body: EnrichRequest, current_user: CurrentUser, db: DBSession):
-    from app.providers.manager import provider_manager
-    result = provider_manager.enrich_word(
-        word=body.word,
-        lemma=body.word,
-        context=body.sentence,
-        source_lang=body.target_lang,   # word is in target lang
-        target_lang=body.source_lang,   # translate TO source lang
-    )
-    # Persist enrichment back to DB
-    from app.models.vocabulary import VocabEntry
-    entry = (
-        db.query(VocabEntry)
-        .filter(
-            VocabEntry.user_id     == current_user.id,
-            VocabEntry.word        == body.word.lower().strip(),
-            VocabEntry.target_lang == body.target_lang,
+def enrich_word(body: EnrichRequest, current_user: OptionalCurrentUser, db: DBSession):
+    # Try provider manager first, fall back to free extract chain
+    translation = phonetic = explanation = pos = sentence_translation = provider_name = ""
+    try:
+        from app.providers.manager import provider_manager
+        result = provider_manager.enrich_word(
+            word=body.word, lemma=body.word, context=body.sentence,
+            source_lang=body.target_lang, target_lang=body.source_lang,
         )
-        .first()
-    )
-    if entry:
-        entry.translation = result.get("translation")
-        entry.pos         = result.get("partOfSpeech")
-        entry.phonetic    = result.get("phonetic")
-        entry.explanation = result.get("explanation")
-        db.commit()
+        r = result.to_dict() if hasattr(result, "to_dict") else result
+        translation         = r.get("translation", "")
+        phonetic            = r.get("phonetic", "")
+        explanation         = r.get("explanation", "")
+        pos                 = r.get("partOfSpeech", r.get("part_of_speech", ""))
+        sentence_translation= r.get("sentenceTranslation", r.get("sentence_translation", ""))
+        provider_name       = r.get("provider", "")
+    except Exception:
+        pass
+
+    # Fallback to free dictionary chain if provider gave nothing
+    if not translation:
+        try:
+            from app.routers.extract import _translate_word
+            from app.providers.dictionary_provider import _free_dict_lookup, _wiktionary_lookup
+            translation = _translate_word(body.word, body.target_lang, body.source_lang)
+            dd = _wiktionary_lookup(body.word, body.target_lang) or _free_dict_lookup(body.word)
+            phonetic    = phonetic    or dd.get("phonetic", "")
+            explanation = explanation or dd.get("definition", "")
+            pos         = pos         or dd.get("partOfSpeech", "")
+            provider_name = provider_name or "dictionary-api"
+        except Exception:
+            pass
+
+    # Persist to DB only when logged in
+    if current_user:
+        try:
+            from app.models.vocabulary import VocabEntry
+            entry = db.query(VocabEntry).filter(
+                VocabEntry.user_id     == current_user.id,
+                VocabEntry.word        == body.word.lower().strip(),
+                VocabEntry.target_lang == body.target_lang,
+            ).first()
+            if entry:
+                entry.translation = translation or entry.translation
+                entry.pos         = pos         or entry.pos
+                entry.phonetic    = phonetic    or entry.phonetic
+                entry.explanation = explanation or entry.explanation
+                db.commit()
+        except Exception:
+            pass
 
     return {
-        "translation":          result.get("translation", ""),
-        "pos":                  result.get("partOfSpeech", "Noun"),
-        "phonetic":             result.get("phonetic", ""),
-        "explanation":          result.get("explanation", ""),
-        "sentence_translation": result.get("sentenceTranslation", ""),
-        "provider":             result.get("provider", ""),
+        "translation":          translation,
+        "pos":                  pos or "Noun",
+        "phonetic":             phonetic,
+        "explanation":          explanation,
+        "sentence_translation": sentence_translation,
+        "provider":             provider_name,
     }

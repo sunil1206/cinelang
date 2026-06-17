@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import Image from 'next/image'
-import { Film, Search, LayoutDashboard, BookMarked, Trophy, LogOut, ChevronDown, BookOpen, Clapperboard } from 'lucide-react'
+import { Film, Search, LayoutDashboard, BookMarked, Trophy, LogOut, ChevronDown, BookOpen, Clapperboard, Layers } from 'lucide-react'
 import { useCineLang } from '@/lib/store'
 import { LANGUAGES, langMeta } from '@/lib/types'
 import { useState } from 'react'
@@ -15,8 +15,9 @@ const NAV = [
   { href: '/search',    label: 'Films',     icon: Search },
   { href: '/cinema',    label: 'Cinema',    icon: Clapperboard },
   { href: '/books',     label: 'Books',     icon: BookOpen },
-  { href: '/learn',     label: 'Learning',  icon: BookMarked },
-  { href: '/mastered',  label: 'Mastered',  icon: Trophy },
+  { href: '/learn',         label: 'Learning',  icon: BookMarked },
+  { href: '/vocab-builder', label: 'Builder',   icon: Layers },
+  { href: '/mastered',      label: 'Mastered',  icon: Trophy },
 ]
 
 export default function Header({ demo, session }: { demo: boolean; session: Session | null }) {

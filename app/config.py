@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # ── AI Provider 1: Gemini 2.5 Flash (PRIMARY) ────────────────────────────
     gemini_api_key: str = ""
-    gemini_model: str   = "gemini-2.5-flash-preview-05-20"
+    gemini_model: str   = "gemini-1.5-flash"
     gemini_timeout: int = 15
 
     # ── AI Provider 3: OpenRouter (free models, no CC needed) ───────────────

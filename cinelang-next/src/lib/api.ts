@@ -154,6 +154,23 @@ export async function enrichWord(
   }>(res)
 }
 
+export async function manualAddWord(
+  word: string,
+  translation: string,
+  source_lang: string,
+  target_lang: string,
+  phonetic: string,
+  explanation: string,
+  token: string,
+) {
+  const res = await fetch(`${BASE}/api/vocabulary/manual-add`, {
+    method: 'POST',
+    headers: headers(token),
+    body: JSON.stringify({ word, translation, source_lang, target_lang, phonetic, explanation }),
+  })
+  return handle<{ id: number; word: string; translation: string; status: string }>(res)
+}
+
 export async function deleteVocab(id: number, token: string) {
   const res = await fetch(`${BASE}/api/vocabulary/${id}`, {
     method: 'DELETE',

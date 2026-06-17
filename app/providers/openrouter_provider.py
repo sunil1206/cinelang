@@ -37,7 +37,7 @@ Return ONLY valid JSON: {{"translations": [{{"index": 1, "text": "translated"}}]
 Lines:
 {lines}"""
 
-_FREE_MODEL = "google/gemma-4-31b-it:free"
+_FREE_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 _BASE_URL   = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -103,7 +103,7 @@ class OpenRouterProvider(BaseProvider):
             is_idiom=bool(data.get("isIdiom", False)),
             is_slang=bool(data.get("isSlang", False)),
             explanation=data.get("explanation", ""),
-            provider="openrouter/gemma-4-31b",
+            provider="openrouter/llama-3.3-70b",
         )
 
     def translate_batch(self, blocks, source_lang, target_lang) -> TranslationResult:
@@ -113,4 +113,4 @@ class OpenRouterProvider(BaseProvider):
         raw   = self._call(_TRANSLATE_PROMPT.format(src=src, tgt=tgt, lines=lines), max_tokens=2048)
         data  = json.loads(raw)
         translations = data if isinstance(data, list) else data.get("translations", [])
-        return TranslationResult(translations=translations, provider="openrouter/gemma-4-31b")
+        return TranslationResult(translations=translations, provider="openrouter/llama-3.3-70b")

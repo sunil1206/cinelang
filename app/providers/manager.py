@@ -88,14 +88,14 @@ class ProviderManager:
 
     def __init__(self):
         self._providers: list[BaseProvider] = [
-            OpenAIProvider(),      # 1 — gpt-4o-mini (paid, best quality)
-            AnthropicProvider(),   # 2 — Claude Haiku
-            GeminiProvider(),      # 3 — Gemini 2.5 Flash (free key)
-            GroqProvider(),        # 4 — Llama 3.3 70B
-            OpenRouterProvider(),  # 5 — free models
-            DictionaryProvider(),  # 6 — MyMemory + FreeDictionary + Wiktionary (no key)
-            OllamaProvider(),      # 7 — local Ollama
-            OfflineProvider(),     # 8 — offline dict + Google Translate
+            GroqProvider(),        # 1 — Llama 3.3 70B (FREE, fast, primary)
+            OpenRouterProvider(),  # 2 — free models (Gemma 4 31B, no cost)
+            DictionaryProvider(),  # 3 — MyMemory + FreeDictionary + Wiktionary (no key)
+            OfflineProvider(),     # 4 — offline dict + Google Translate
+            GeminiProvider(),      # 5 — Gemini (if key is valid)
+            OpenAIProvider(),      # 6 — gpt-4o-mini (paid, last resort)
+            AnthropicProvider(),   # 7 — Claude (if key set)
+            OllamaProvider(),      # 8 — local Ollama
         ]
         self._breakers: dict[str, CircuitBreaker] = {
             p.name.value: CircuitBreaker() for p in self._providers
