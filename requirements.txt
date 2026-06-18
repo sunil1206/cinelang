@@ -36,7 +36,7 @@ mistralai>=1.0.0
 # ── LangChain / LangGraph — pinned to avoid slow resolver ────────────────────
 langgraph==0.2.28
 langchain==0.2.16
-langchain-core==0.2.38
+langchain-core==0.2.39
 langchain-openai==0.1.25
 langchain-groq==0.1.9
 langchain-google-genai==1.0.10
