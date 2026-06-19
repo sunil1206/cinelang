@@ -81,7 +81,7 @@ export default function SubtitlePlayer({ onWordClick }: Props) {
                     {sourceLang?.toUpperCase()}
                   </span>
                   <p className="text-warm-400 text-sm italic leading-relaxed mt-0.5">
-                    {('original' in current) ? current.original : current.text}
+                    {(current as any).original ?? (current as any).text}
                   </p>
                 </div>
                 <div className="w-12 h-px bg-warm-700 mb-2" />
