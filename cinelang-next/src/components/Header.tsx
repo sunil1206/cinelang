@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import Image from 'next/image'
-import { Film, Search, LayoutDashboard, BookMarked, Trophy, LogOut, ChevronDown, BookOpen, Clapperboard, Layers, Brain } from 'lucide-react'
+import { Film, Search, LayoutDashboard, BookMarked, Trophy, LogOut, ChevronDown, BookOpen, Clapperboard, Layers, Brain, GalleryVertical } from 'lucide-react'
 import { useCineLang } from '@/lib/store'
 import { LANGUAGES, langMeta } from '@/lib/types'
 import { useState } from 'react'
@@ -17,6 +17,7 @@ const NAV = [
   { href: '/books',     label: 'Books',     icon: BookOpen },
   { href: '/learn',         label: 'Learning',  icon: BookMarked },
   { href: '/vocab-builder', label: 'Builder',   icon: Layers },
+  { href: '/flashcards',    label: 'Flashcards', icon: GalleryVertical },
   { href: '/quiz',          label: 'Quiz',      icon: Brain },
   { href: '/mastered',      label: 'Mastered',  icon: Trophy },
 ]
