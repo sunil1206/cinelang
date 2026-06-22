@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.database import create_tables
 from app.routers import auth, users, vocabulary, subtitles, translations, ai
-from app.routers import languages, decks, reviews, lessons, quiz, books, cinema
+from app.routers import languages, decks, reviews, lessons, quiz, books, cinema, extract
 
 log      = logging.getLogger(__name__)
 settings = get_settings()
@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(quiz.router,         prefix=prefix)
     app.include_router(books.router,        prefix=prefix)
     app.include_router(cinema.router,       prefix=prefix)
+    app.include_router(extract.router,      prefix=prefix)
 
     @app.get("/api/health", tags=["System"])
     def health():

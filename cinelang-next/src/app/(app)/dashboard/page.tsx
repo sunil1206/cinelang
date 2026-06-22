@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   // Load vocab from server
   const { data: serverVocab } = useSWR<VocabEntry[]>(
-    token ? `/api/vocabulary?target_lang=${targetLang}` : null,
+    token ? `/api/vocabulary?target_lang=${targetLang}&limit=500` : null,
     makeFetcher(token),
   )
 

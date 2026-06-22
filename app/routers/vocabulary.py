@@ -38,8 +38,10 @@ def list_vocab(
     db:           DBSession,
     target_lang:  Optional[str] = Query(None),
     status:       Optional[str] = Query(None),
+    limit:        int           = Query(200, ge=1, le=1000),
+    offset:       int           = Query(0,   ge=0),
 ):
-    return vocab_service.list_vocab(db, current_user, target_lang, status)
+    return vocab_service.list_vocab(db, current_user, target_lang, status, limit, offset)
 
 
 @router.post("", response_model=VocabOut, summary="Add or update a vocabulary entry")
@@ -169,7 +171,7 @@ def enrich_word(body: EnrichRequest, current_user: OptionalCurrentUser, db: DBSe
         from app.providers.manager import provider_manager
         result = provider_manager.enrich_word(
             word=body.word, lemma=body.word, context=body.sentence,
-            source_lang=body.target_lang, target_lang=body.source_lang,
+            source_lang=body.source_lang, target_lang=body.target_lang,
         )
         r = result.to_dict() if hasattr(result, "to_dict") else result
         translation         = r.get("translation", "")

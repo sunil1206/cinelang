@@ -300,7 +300,7 @@ export default function VocabBuilderPage() {
   const filtered = words.filter(w => {
     if (filter === 'missing' && w.translation) return false
     if (filter === 'done'    && !w.translation) return false
-    if (search && !w.word.toLowerCase().includes(search.toLowerCase()) && !w.translation.toLowerCase().includes(search.toLowerCase())) return false
+    if (search && !w.word.toLowerCase().includes(search.toLowerCase()) && !(w.translation ?? '').toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 

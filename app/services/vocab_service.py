@@ -17,13 +17,15 @@ def list_vocab(
     user: User,
     target_lang: str | None = None,
     status: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
 ) -> list[VocabOut]:
     q = db.query(VocabEntry).filter(VocabEntry.user_id == user.id)
     if target_lang:
         q = q.filter(VocabEntry.target_lang == target_lang)
     if status:
         q = q.filter(VocabEntry.status == status)
-    return [_serialise(e) for e in q.order_by(VocabEntry.updated_at.desc()).all()]
+    return [_serialise(e) for e in q.order_by(VocabEntry.updated_at.desc()).offset(offset).limit(limit).all()]
 
 
 def upsert_vocab(db: Session, user: User, req: VocabUpsertRequest) -> VocabOut:
